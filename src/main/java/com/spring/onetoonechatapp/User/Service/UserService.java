@@ -29,4 +29,7 @@ public class UserService {
     public List<User> findConnectedUsers() {
         return userRepository.findAllByStatus(Status.ONLINE);
     }
+
+
 }
+

@@ -30,16 +30,18 @@ function connect(event) {
     event.preventDefault();
 }
 
-
 function onConnected() {
+    // private messages
     stompClient.subscribe(`/user/${nickname}/queue/messages`, onMessageReceived);
-    stompClient.subscribe(`/user/public`, onMessageReceived);
+
+    // broadcast users
+    stompClient.subscribe("/topic/public", onMessageReceived);
 
     // register the connected user
-    stompClient.send("/app/user.addUser",
-        {},
+    stompClient.send("/app/user.addUser", {},
         JSON.stringify({nickName: nickname, fullName: fullname, status: 'ONLINE'})
     );
+
     document.querySelector('#connected-user-fullname').textContent = fullname;
     findAndDisplayConnectedUsers().then();
 }
@@ -101,7 +103,6 @@ function userItemClick(event) {
     const nbrMsg = clickedUser.querySelector('.nbr-msg');
     nbrMsg.classList.add('hidden');
     nbrMsg.textContent = '0';
-
 }
 
 function displayMessage(senderId, content) {
@@ -128,12 +129,10 @@ async function fetchAndDisplayUserChat() {
     chatArea.scrollTop = chatArea.scrollHeight;
 }
 
-
 function onError() {
-    connectingElement.textContent = 'Could not connect to WebSocket server. Please refresh this page to try again!';
+    connectingElement.textContent = 'Could not connect to WebSocket server. Please refresh!';
     connectingElement.style.color = 'red';
 }
-
 
 function sendMessage(event) {
     const messageContent = messageInput.value.trim();
@@ -141,22 +140,24 @@ function sendMessage(event) {
         const chatMessage = {
             senderId: nickname,
             recipientId: selectedUserId,
-            content: messageInput.value.trim(),
+            content: messageContent,
             timestamp: new Date()
         };
         stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
-        displayMessage(nickname, messageInput.value.trim());
+        displayMessage(nickname, messageContent);
         messageInput.value = '';
     }
     chatArea.scrollTop = chatArea.scrollHeight;
     event.preventDefault();
 }
 
-
 async function onMessageReceived(payload) {
-    await findAndDisplayConnectedUsers();
     console.log('Message received', payload);
     const message = JSON.parse(payload.body);
+
+    // refresh user list
+    await findAndDisplayConnectedUsers();
+
     if (selectedUserId && selectedUserId === message.senderId) {
         displayMessage(message.senderId, message.content);
         chatArea.scrollTop = chatArea.scrollHeight;
@@ -172,15 +173,17 @@ async function onMessageReceived(payload) {
     if (notifiedUser && !notifiedUser.classList.contains('active')) {
         const nbrMsg = notifiedUser.querySelector('.nbr-msg');
         nbrMsg.classList.remove('hidden');
-        nbrMsg.textContent = '';
+        nbrMsg.textContent = (parseInt(nbrMsg.textContent) || 0) + 1;
     }
 }
 
 function onLogout() {
-    stompClient.send("/app/user.disconnectUser",
-        {},
-        JSON.stringify({nickName: nickname, fullName: fullname, status: 'OFFLINE'})
-    );
+    if (stompClient) {
+        stompClient.send("/app/user.disconnectUser", {},
+            JSON.stringify({nickName: nickname, fullName: fullname, status: 'OFFLINE'})
+        );
+        stompClient.disconnect();
+    }
     window.location.reload();
 }
 
